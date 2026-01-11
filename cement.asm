@@ -570,20 +570,30 @@ add_platform_right:
 	RET
 
 process_tick:
+	; Add 1 to tick counter
+	LD I, tick_count
+	LD V3, [I]
+	LD V8, 1
+	ADD V0, V8
+	ADD V1, VF
+	ADD V2, VF
+	ADD V3, VF
+	LD I, tick_count
+	LD [I], V3
 
 	LD V8, 3
 	AND V8, V0
 	SNE V8, 0 
 	CALL process_left_buckets
 
-	LD I, frame_count
+	LD I, tick_count
 	LD V0, [I]
 	LD V8, 3
 	AND V8, V0
 	SNE V8, 2 
 	CALL process_right_buckets
 
-	LD I, frame_count
+	LD I, tick_count
 	LD V0, [I]
 	LD V8, 1
 	AND V8, V0
@@ -591,7 +601,7 @@ process_tick:
 	CALL process_left_platforms
 
 	; Move Right Platforms Around
-	LD I, frame_count
+	LD I, tick_count
 	LD V0, [I]
 	LD V8, 1
 	AND V8, V0
@@ -1508,6 +1518,7 @@ time_governing_struct: ; 6 bytes
 time_since_last_tick: db 0
 speed: db 12
 frame_count: dw 0,0
+tick_count: dw 0,0
 
 buckets_pos:
 ;most significant nybble is for left buckets
