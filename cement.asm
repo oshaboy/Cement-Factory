@@ -62,7 +62,6 @@ define DT_DIV 4
 
 define BUCKET_SPAWN_RND #0F
 define BUCKET_SPAWN_RATE 3
-define PLATFORM_SPAWN_RATE #03 
 
 
 JP reset
@@ -562,7 +561,7 @@ add_platform_right:
 
 
 
-	RND V7, 1
+	RND V7, 3
 	ADD V7, 3
 	LD V0, V7
 	LD I, ticks_to_next_platform_right
@@ -643,7 +642,6 @@ move_loop:
 		ADD V3, V8
 		ADD V4, V9
 		move_loop_inner:
-			;LD I, full_bucket
 			;Check if the bucket is before or after the boundary and set I 
 			;accordingly 
 			SNE V3,VA
@@ -907,9 +905,9 @@ process_input_movement:
 	SNE V3, -1
 	RET
 	; Check if player is inside one of the walls
-	SNE V3, 0
+	SE V3, 0
+	SNE V3, 3
 	JP skip_check_V3
-	SE V3, 3
 	LD V0, 1
 	LD ST, V0
 	JP move_player
@@ -919,7 +917,6 @@ skip_check_V3:
 	RET
 	LD V0, 1
 	LD ST, V0
-	JP move_player
 
 ;expects a VALID move (either moving or falling off,
 ; no moves to an illegal position) and processes it.
