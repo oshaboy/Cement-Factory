@@ -89,7 +89,9 @@ DRWG_end:
 reset:
 	;setup
 	CLS
-	
+	;Some interpreters do not zero initialize ST
+	LD V0, 0
+	LD ST, V0
 	;Detect XO-CHIP and change the color 
 	SE VF, VF
 	dw #f000 ; LD I, ABS.16
@@ -211,7 +213,6 @@ life_draw_loop:
 
 main_game_loop:
 	LD V1, DT
-
 	SE V1, 0
 	JP main_game_loop
 	LD V1, DT_DIV
@@ -252,23 +253,21 @@ process_frame:
 	LD [I], V3
 
 
-	; Once about every minute, raise the speed
-	LD V8, 3
+	; Once about every half minute, raise the speed
+	LD V8, 1
 	AND V8, V1
 	OR V8, V0
 	SE V8, 0
 	RET
-
 	LD I, speed
 	LD V0, [I]
 	SNE V0, 2
 	RET
-	ADD V0, -2
+	ADD V0, -1
 	LD I, speed
 	LD [I], V0
 	RET
-define BUCKET_CHANCE_ENUM 0
-define PLATFORM_CHANCE_ENUM 4
+
 define BUCKET_Y 4
 define BUCKET_END_LX 0
 define BUCKET_END_RX 59
@@ -489,8 +488,9 @@ add_platform_left:
 	DRW V3, V4, PLATFORM_HEIGHT
 
 	RND V7, 3
-	ADD V7, 3
+	ADD V7, 2
 	LD V0, V7
+	;LD V0, 1
 	LD I, ticks_to_next_platform_left
 	LD [I], V0
 	RET
@@ -562,8 +562,9 @@ add_platform_right:
 
 
 	RND V7, 3
-	ADD V7, 3
+	ADD V7, 2
 	LD V0, V7
+	;LD V0, 1
 	LD I, ticks_to_next_platform_right
 	LD [I], V0
 	RET
@@ -724,28 +725,16 @@ draw_player:
 	DRW V3, V4, PLAYER_HEIGHT
 	RET
 
+define Q4 4
+define W5 5
+define A7 7
+define S8 8
+define E6 6
+define RD 13
+define D9 9
+define FE 14
 
 process_input:
-	LD V0, 0
-	LD V1, 0
-	LD V6, 0
-	LD VA, 128
-
-	process_input_loop:
-		SHR V0, V0
-		SHR V1, V1
-		SNE VF, 1
-		OR V0, VA
-		SKNP V6
-		OR V1, VA
-
-		ADD V6, 1
-		SE V6, 16
-	JP process_input_loop
-process_input_loop_end:
-
-	LD I, input_bitmask
-	LD [I], V1
 	CALL process_input_movement
 	JP process_input_lever
 
@@ -761,17 +750,19 @@ process_input_lever:
 
 
 	; Test the lever key
-	LD I, input_bitmask
-	LD V1, [I]
-
-	LD V6, LEVER_BUTTON_BITMASK_LOW
-	AND V6, V0
-	SE V6, 0
+	;LD V6, 0
+	LD V6, E6
+	LD V7, RD
+	SKP V6
+	SKNP V7
 	JP push_lever
-
-	LD V7, LEVER_BUTTON_BITMASK_HIGH
-	AND V7, V1
-	SNE V7, 0
+	
+	LD V6, D9
+	LD V7, FE
+	
+	SKP V6
+	SKNP V7
+	JP push_lever
 	RET
 
 push_lever:
@@ -820,15 +811,18 @@ push_lever:
 
 check_lever_input_release:
 	; Test the lever key
-	LD I, input_bitmask
-	LD V1, [I]
-	LD V6, LEVER_BUTTON_BITMASK_LOW
-	AND V6, V0
+	LD V6, E6
+	LD V7, RD
 
-	LD V7, LEVER_BUTTON_BITMASK_HIGH
-	AND V7, V1
-	SNE V7, 0
-	SE V6, 0
+	SKP V6
+	SKNP V7
+	RET
+
+	LD V6, D9
+	LD V7, FE
+
+	SKP V6
+	SKNP V7
 	RET
 
 	;Lever key is released
@@ -856,29 +850,26 @@ release_lever:
 	LD [I], V0
 
 	RET
-define KEY_LEFT_BITMASK_LOW %10010000
-define KEY_RIGHT_BITMASK_LOW %00100000
-define KEY_RIGHT_BITMASK_HIGH %00000001
+
+
+
+
 process_input_movement:
-	LD I, input_bitmask
-	LD V1, [I]
-	LD V8, V0
-	LD V9, V1
 
 	;set V1 with the current horizontal direction
 	LD V1, 0
 
-	LD V6, KEY_LEFT_BITMASK_LOW
-	AND V6, V8
-	SE V6, 0
-	ADD V1,-1
-	LD V6, KEY_RIGHT_BITMASK_LOW
-	AND V6, V8
-	LD V7, KEY_RIGHT_BITMASK_HIGH
-	AND V7, V9
-	SNE V7, 0
-	SE V6, 0
-	ADD V1,1
+	LD V6, A7
+	LD V7, Q4
+	SKP V6
+	SKNP V7
+	ADD V1, -1 
+
+	LD V6, S8
+	LD V7, W5	
+	SKP V6
+	SKNP V7
+	ADD V1, 1 
 
 	; get last frame's input
 	LD I, nowdirection
@@ -1540,8 +1531,6 @@ nowdirection:
 	db 0
 prev_lever_input_state:
 	db 0
-input_bitmask:
-	dw 0
 lives: db 3
 
 ;fill levels for all cement tubs
