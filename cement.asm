@@ -179,7 +179,6 @@ reset:
 	dw #f000 ; LD I, ABS.16
 	SE VF, VF
 	dw #f101 ; PLN 1
-	;JP debug_draw_all_player_positions
 	CALL draw_player
 	
 	LD I, life_spr
@@ -507,7 +506,6 @@ add_platform_left:
 	RND V7, 3
 	ADD V7, 2
 	LD V0, V7
-	;LD V0, 1
 	LD I, ticks_to_next_platform_left
 	LD [I], V0
 	RET
@@ -517,8 +515,6 @@ process_right_platforms:
 	LD I, platforms_pos_right
 	LD V0, [I]
 	LD V1, V0
-	; LD VC, #0F
-	; AND V1, VC
 	SNE V1, 0
 	JP skip_move_right_platforms
 
@@ -1257,6 +1253,7 @@ show_score:
 	LD V2, [I]
 
 	CALL draw_2_digits
+	;wait for a reset
 stuck:
 	JP stuck
 
@@ -1269,26 +1266,6 @@ draw_2_digits:
 	DRW V3, V4, 5
 	ADD V3, 5
 	RET
-;Wait for a reset
-
-debug_draw_all_player_positions:
-	LD VB,0
-	debug_draw_all_player_positions_outer_loop:
-		LD VA,0 
-		debug_draw_all_player_positions_inner_loop:
-			LD V0, VA
-			LD V1, VB
-			LD I, player_pos_struct
-			LD [I], V1
-			call draw_player
-			ADD VA, 1
-			SE VA, 4
-			JP debug_draw_all_player_positions_inner_loop
-		ADD VB, 1
-		SE VB, 4
-		JP debug_draw_all_player_positions_outer_loop
-
-	JP stuck
 ;V8 - Amount to Increment
 increment_score:
 	LD I, score
