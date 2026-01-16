@@ -60,9 +60,8 @@ define CEMENT_HEIGHT 1
 
 define DT_DIV 4
 
-define BUCKET_SPAWN_RND #0F
-define BUCKET_SPAWN_RATE 3
-
+define BUCKET_SPAWN_RND #07
+define BUCKET_GRACE_PERIOD 8
 
 JP reset
 brk:
@@ -253,8 +252,8 @@ process_frame:
 	LD [I], V3
 
 
-	; Once about every half minute, raise the speed
-	LD V8, 1
+	; Once about every minute, raise the speed
+	LD V8, 3
 	AND V8, V1
 	OR V8, V0
 	SE V8, 0
@@ -316,10 +315,16 @@ process_left_buckets:
 skip_move_left_bucket:
 	;Randomly Generate Left Bucket
 	RND V7, BUCKET_SPAWN_RND
-	LD VA, BUCKET_SPAWN_RATE
-	SUB V7,VA
- 	SNE VF, 0
-	CALL add_bucket_left
+	SNE V7, 0
+	JP add_bucket_left
+	LD I, time_since_last_left_bucket
+	LD V0, [I]
+	SNE V0, BUCKET_GRACE_PERIOD
+	JP add_bucket_left
+	ADD V0, 1
+	LD I, time_since_last_left_bucket
+	LD [I], V0
+process_left_buckets_epilogue:	
 	; save the position bitmask
 	LD I, buckets_pos_left
 	LD V0, V1
@@ -333,7 +338,10 @@ add_bucket_left:
 	OR V1, V2
 	LD I, full_bucket
 	DRW V3, V4, BUCKET_HEIGHT
-	RET
+	LD I, time_since_last_left_bucket
+	LD V0, 0 
+	LD [I], V0
+	JP process_left_buckets_epilogue
 
 ; Drop cement from bucket into left container
 drop_cement_left:
@@ -399,8 +407,6 @@ process_right_buckets:
 	LD V0, [I]
 	LD V1, V0
 	SHR V1, V1
-
-	;LD V5, 1
 	CALL drop_cement_right
 	
 skip_move_right_buckets:
@@ -408,16 +414,23 @@ skip_move_right_buckets:
 	LD V3, BUCKET_START_RX
 	LD V4, BUCKET_Y
 	RND V7, BUCKET_SPAWN_RND
-	LD VA, BUCKET_SPAWN_RATE
-	SUB V7,VA
- 	SNE VF, 0
-	CALL add_bucket_right
-	
+	SNE V7, 0
+	JP add_bucket_right
+	LD I, time_since_last_right_bucket
+	LD V0, [I]
+	SNE V0, BUCKET_GRACE_PERIOD
+	JP add_bucket_right
+	ADD V0, 1
+	LD I, time_since_last_right_bucket
+	LD [I], V0
+
+process_right_buckets_epilogue:
 	; save the position bitmask
 	LD I, buckets_pos_right
 	LD V0, V1
 	LD [I], V0
 	RET
+
 add_bucket_right:
 	LD V3, BUCKET_START_RX
 	LD V4, BUCKET_Y
@@ -425,7 +438,11 @@ add_bucket_right:
 	OR V1, V2
 	LD I, full_bucket
 	DRW V3, V4, BUCKET_HEIGHT
-	RET
+	LD I, time_since_last_right_bucket
+	LD V0, 0 
+	LD [I], V0
+	JP process_right_buckets_epilogue
+
 process_left_platforms:
 	; Move Left Platforms Around
 	LD I, platforms_pos_left
@@ -1545,7 +1562,8 @@ cur_lever: db 0
 time_until_lever_release: db 0
 ticks_to_next_platform_left: db 0
 ticks_to_next_platform_right: db 0
-
+time_since_last_left_bucket: db 4 
+time_since_last_right_bucket: db 0 
 score:
 score_hi:
 	db 0
