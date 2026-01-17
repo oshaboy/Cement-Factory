@@ -66,25 +66,6 @@ define BUCKET_GRACE_PERIOD 8
 JP reset
 brk:
 	RET
-;Draw with height of register V0
-;V3=X V4=Y
-DRWG: 
-	SHL V0,V0
-	SHL V0,V0
-DRWG_table:
-	LD V2, V0 ;Bxxx quirk workaround
-	JP V0, DRWG_table
-	DRW V3, V4, 1
-	JP DRWG_end
-	DRW V3, V4, 2
-	JP DRWG_end
-	DRW V3, V4, 3
-	JP DRWG_end
-	DRW V3, V4, 4
-DRWG_end:
-	SHR V0, V0
-	SHR V0, V0
-	RET
 reset:
 	;setup
 	CLS
@@ -268,18 +249,19 @@ process_frame:
 
 define BUCKET_Y 4
 define BUCKET_END_LX 0
-define BUCKET_END_RX 59
+define BUCKET_END_RX 63
 define BUCKET_START_LX 12
 define BUCKET_START_RX 47
 define BUCKET_HEIGHT 4
 
 define BUCKET_FULL_EMPTY_BOUNDARY_LX 8
-define BUCKET_FULL_EMPTY_BOUNDARY_RX 51
+define N_BUCKET_FULL_EMPTY_BOUNDARY_LX -8
+define BUCKET_FULL_EMPTY_BOUNDARY_RX 47
 
 define PLATFORM_START_RY 8
 define PLATFORM_START_LY 29
 define PLATFORM_END_LY 8
-define PLATFORM_END_RY 29
+define PLATFORM_END_RY 36
 define PLATFORM_RX 33
 define PLATFORM_LX 23  
 define PLATFORM_NOPLATFORM_BOUNDARY_LY 8
@@ -293,17 +275,8 @@ process_left_buckets:
 	LD V1, V0
 	SNE V1, 0
 	JP skip_move_left_bucket
+	CALL move_buckets_left
 
-	LD V3, BUCKET_END_LX
-	LD V4, BUCKET_Y
-	LD V8, -4
-	LD V9, 0
-	LD V0, BUCKET_HEIGHT
-	LD VA, BUCKET_FULL_EMPTY_BOUNDARY_LX
-	LD VB, BUCKET_HEIGHT
-
-	LD I, empty_bucket
-	CALL move_random_sprite
 	;rotate the position bitmask
 	LD I, buckets_pos_left
 	LD V0, [I]
@@ -333,7 +306,7 @@ process_left_buckets_epilogue:
 add_bucket_left:
 	LD V3, BUCKET_START_LX
 	LD V4, BUCKET_Y
-	LD V2, #10
+	LD V2, 1
 	OR V1, V2
 	LD I, full_bucket
 	DRW V3, V4, BUCKET_HEIGHT
@@ -344,7 +317,7 @@ add_bucket_left:
 
 ; Drop cement from bucket into left container
 drop_cement_left:
-	LD V8, #40 
+	LD V8, 4
 	AND V8, V1
 	SNE V8, 0
 	RET
@@ -391,16 +364,7 @@ process_right_buckets:
 	SNE V1, 0
 	JP skip_move_right_buckets
 
-	LD V3, BUCKET_END_RX
-	LD V4, BUCKET_Y
-	LD V8, 4
-	LD V9, 0
-	LD V0, BUCKET_HEIGHT
-	LD VA, BUCKET_FULL_EMPTY_BOUNDARY_RX
-	LD VB, BUCKET_HEIGHT
-	LD I, empty_bucket
-	CALL move_random_sprite
-
+	CALL move_buckets_right
 	;rotate the position bitmask
 	LD I, buckets_pos_right
 	LD V0, [I]
@@ -450,15 +414,7 @@ process_left_platforms:
 	SNE V1, 0
 	JP skip_move_left_platforms
 
-	LD V3, PLATFORM_LX
-	LD V4, PLATFORM_END_LY
-	LD V8, 0
-	LD V9, -7
-	LD V0, PLATFORM_HEIGHT
-	LD VA, PLATFORM_NOPLATFORM_BOUNDARY_LY
-	LD VB, 1
-	LD I, no_platform
-	CALL move_random_sprite
+	CALL move_platforms_left
 
 	;rotate the position bitmask
 	LD I, platforms_pos_left
@@ -498,7 +454,7 @@ skip_move_left_platforms:
 add_platform_left:
 	LD V3, PLATFORM_LX
 	LD V4, PLATFORM_START_LY
-	LD V2, #10
+	LD V2, 1
 	OR V1, V2
 	LD I, platform
 	DRW V3, V4, PLATFORM_HEIGHT
@@ -518,16 +474,7 @@ process_right_platforms:
 	SNE V1, 0
 	JP skip_move_right_platforms
 
-	LD V3, PLATFORM_RX
-	LD V4, PLATFORM_END_RY
-	LD V8, 0
-	LD V9, 7
-	LD V0, PLATFORM_HEIGHT
-	LD VA, -128
-	LD VB, 0
-	LD I, platform
-	CALL move_random_sprite
-
+	CALL move_platforms_right
 	; rotate the position bitmask
 	LD I, platforms_pos_right
 	LD V0, [I]
@@ -577,7 +524,6 @@ add_platform_right:
 	RND V7, 3
 	ADD V7, 2
 	LD V0, V7
-	;LD V0, 1
 	LD I, ticks_to_next_platform_right
 	LD [I], V0
 	RET
@@ -619,94 +565,107 @@ process_tick:
 	LD V8, 1
 	AND V8, V0
 	SNE V8, 1
-	CALL process_right_platforms
+	JP process_right_platforms
 
 	RET
-	
-; click_lever:
-; 	LD VF, VF
-; 	RET
 
-
-; This moves 4 sprites based on an 4 bit bitmask
-; moving the left nybble left and the right nybble right
-; V3=end x
-; V4=end y
-; V8=delta x
-; V9=delta y
-; I = sprite
-; V1 = bitmask (high nybble is occupied for left, low nybble for right)
-; V0 = Height
-; VA = optional X or Y boundary, -1 for no boundary
-; VB = offset for new sprite after boundary
-move_random_sprite:
+move_buckets_right:
+	LD V3, BUCKET_END_RX
+	LD V4, BUCKET_Y
 	LD V5, 4
-	;V7 is nonzero if right has stuff in it and 0 otherwise
-	;presumably with stuff in the left
-	LD V7, #0F 
-	AND V7, V1
-move_loop:
-		SE V7, 0
+	move_buckets_right_loop:
 		SHR V1, V1
-		SNE V7, 0
-		SHL V1, V1
 		SNE VF, 0
-		JP skip_draw
-		LD V6, 2
-		ADD V3, V8
-		ADD V4, V9
-		move_loop_inner:
-			;Check if the bucket is before or after the boundary and set I 
-			;accordingly 
-			SNE V3,VA
-			JP switch_sprite
-			SE V4, VA
-			JP dont_switch_sprite
-		switch_sprite:
-			ADD I, VB
-			LD VA, -128
-		dont_switch_sprite:
-
-			; make sure it isn't drawn off screen
-			LD VC, #3F
-			SUBN VC, V3
-			SE VF, 0
-			JP out_of_bounds
-			LD VC, #1F
-			SUBN VC, V4
-			SNE VF, 0
-		not_out_of_bounds:
-			CALL DRWG
-		out_of_bounds:
-
-			;go to next loop iteration
-			SUB V3, V8 ;subtract vel from X
-			SUB V4, V9 ;subtract vel from Y
-
-			ADD V6, -1
-			SE V6, 0
-			JP move_loop_inner
-		ADD V3, V8
-		ADD V4, V9
-
-	skip_draw:
-		SNE V3,VA
-		JP switch_sprite2
-		SE V4, VA
-		JP dont_switch_sprite2
-	switch_sprite2:
-		ADD I, VB
-		LD VA, -128
-	dont_switch_sprite2:
-		SUB V3, V8
-		SUB V4, V9
-
+		JP no_bucket_right
+		SE V3, 63
+		CALL draw_bucket
+		ADD V3, -4
+		CALL erase_bucket
+		SE VF, VF
+	no_bucket_right:
+		ADD V3, -4
 		ADD V5, -1
 		SE V5, 0
-		JP move_loop
+		JP move_buckets_right_loop
 	RET
 
 
+move_buckets_left:
+	LD V3, BUCKET_START_LX
+	LD V4, BUCKET_Y
+	LD V5, 4
+	move_buckets_left_loop:
+		SHR V1, V1
+		SNE VF, 0
+		JP no_bucket_left
+		CALL erase_bucket
+		ADD V3, -4
+		SE V3, -4 
+		CALL draw_bucket
+		SE VF, VF
+	no_bucket_left:
+		ADD V3, -4
+		ADD V5, -1
+		SE V5, 0
+		JP move_buckets_left_loop
+	RET
+
+
+move_platforms_right:
+	LD V3, PLATFORM_RX
+	LD V4, PLATFORM_END_RY
+	; LD I, platforms_pos_right
+	; LD V0, [I]
+	LD V5, 4
+	move_platforms_right_loop:
+		SHR V1, V1
+		SNE VF, 0
+		JP no_platforms_right
+		LD I, platform
+		SE V4, PLATFORM_END_RY
+		DRW V3, V4, PLATFORM_HEIGHT
+		ADD V4, -7
+		DRW V3, V4, PLATFORM_HEIGHT
+		SE VF, VF
+	no_platforms_right:
+		ADD V4, -7
+		ADD V5, -1
+		SE V5, 0
+		JP move_platforms_right_loop
+	RET
+
+move_platforms_left:
+	LD V3, PLATFORM_LX
+	LD V4, PLATFORM_START_LY
+	LD V5, 4
+	move_platforms_left_loop:
+		SHR V1, V1
+		SNE VF, 0
+		JP no_platforms_left
+		LD I, platform
+		DRW V3, V4, PLATFORM_HEIGHT
+		ADD V4, -7
+		SE V4, 1
+		DRW V3, V4, PLATFORM_HEIGHT
+		SE VF, VF
+	no_platforms_left:
+		ADD V4, -7
+		ADD V5, -1
+		SE V5, 0
+		JP move_platforms_left_loop
+	RET
+draw_bucket:
+erase_bucket:
+	LD VA, V3
+	LD VA, V3
+	ADD VA, N_BUCKET_FULL_EMPTY_BOUNDARY_LX
+	LD V9, BUCKET_FULL_EMPTY_BOUNDARY_RX
+	SUB VA, V9
+	LD I, empty_bucket
+	SNE VF,0 
+	LD I, full_bucket
+	DRW V3, V4, BUCKET_HEIGHT
+	RET
 ; draw or erases player based on player_pos_struct
 erase_player:
 draw_player:
@@ -953,10 +912,12 @@ fall_check_platforms_left:
 	LD I, platforms_pos_left
 	LD V0, [I]
 
+	LD V8, 3
+	SUBN V1, V8
 fall_check_left_loop:
 	;check if the correct platform pos bit is set
 	ADD V1, -1
-	SHL V0, V0
+	SHR V0, V0
 	SE V1, -1
 	JP fall_check_left_loop
 
@@ -1192,10 +1153,8 @@ release_cement:
 	LD V8, 1
 	SE VA, 0
 	LD V8, 2
-	CALL increment_score
+	JP increment_score
 
-
-	RET
 ;VB top container
 add_cement_row_down:
 	LD V3, CONTAINER_LEFT_X
@@ -1217,8 +1176,6 @@ add_cement_row_down:
 	ADD I, VB
 	LD V0, V8
 	LD [I], V0
-	
-
 	RET
 ;TODO
 show_score:
@@ -1242,22 +1199,20 @@ show_score:
 	LD V1, [I]
 	LD V8, V0
 	LD V9, V1
-	LD I, temp_storage
-	LD B, V8
-	LD V2, [I]
+
 
 	CALL draw_2_digits
-
-	LD I, temp_storage
-	LD B, V9
-	LD V2, [I]
-
+	LD V8, V9
 	CALL draw_2_digits
 	;wait for a reset
 stuck:
 	JP stuck
 
 draw_2_digits:
+	LD I, temp_storage
+	LD B, V8
+	LD V2, [I]
+
 	LD F, V1
 	DRW V3, V4, 5
 	ADD V3, 5
@@ -1293,18 +1248,8 @@ end_code_segment:
 ;data 
 OFFSET #900
 ;graphics data
-;I need 2 because ADD I, Vx can only increment
-;And I need it to go both ways
-no_platform: db %00000000
-platform: db %11111111
-no_platform2: db %00000000
 
-container:
-	db 
-		 %10000001,
-		 %10000001,
-		 %10000001,
-		 %11111111
+
 truck: 
 	db  
 		%01000010,
@@ -1375,8 +1320,17 @@ full_bucket:
 		%01110000
 
 player_spr_table:
-	db ; 0,0 (impossible)
-		0,0,0,0,0,0
+	; 0,0 (impossible)
+	; I'm cramming data here because there's free space
+	platform:
+		db %11111111
+	container:
+	db 
+		 %10000001,
+		 %10000001,
+		 %10000001,
+		 %11111111
+	db 0 ;padding
 	db ; 1,0
 		%00001100,
 		%10011000,
@@ -1391,8 +1345,17 @@ player_spr_table:
 		%00011110,
 		%00011000,
 		%00100100
-	db ; 3,0 (impossible)
-		0,0,0,0,0,0
+	; 3,0 (impossible)
+life_spr:
+	db 
+		%01000000,
+		%11100000,
+		%01000000
+lever_activate:
+	db 
+		%10000000,
+		%00000000,
+		%10000000
 	db ; 0,1
 		%00011000,
 		%00011000,
@@ -1450,8 +1413,17 @@ player_spr_table:
 		%01011000,
 		%00011000,
 		%00100100
-	db ; 0,0 (impossible)
-		0,0,0,0,0,0
+	; 0,3 (impossible)
+	cement: db %01010100
+	lever_left:
+	db
+		%01000000,
+		%10000000
+	lever_right:
+	db
+		%10000000,
+		%01000000
+	db 0 ;padding
 	db ; 1,0
 		%00001100,
 		%00011000,
@@ -1466,27 +1438,11 @@ player_spr_table:
 		%10011000,
 		%00011000,
 		%00100100
-	db ; 3,0 (impossible)
-		0,0,0,0,0,0
-life_spr:
-	db 
-		%01000000,
-		%11100000,
-		%01000000
-cement: db %01010100
-lever_left:
-	db
-		%01000000,
-		%10000000
-lever_right:
-	db
-		%10000000,
-		%01000000
-lever_activate:
-	db 
-		%10000000,
-		%00000000,
-		%10000000
+	; 3,0 (impossible)
+
+
+
+
 
 ;constant data
 player_pos_table_x:
@@ -1503,7 +1459,7 @@ frame_count: dw 0,0
 tick_count: dw 0,0
 
 buckets_pos:
-;most significant nybble is for left buckets
+;least significant nybble is for left buckets
 buckets_pos_left: db %00000000
 ;least significant nybble is for right buckets
 buckets_pos_right: db %00000000
@@ -1546,17 +1502,12 @@ score_hi:
 	db 0
 score_lo: 
 	db 0
-temp_storage: ;8 bytes
+temp_storage:
 	db #cc, #cc, #cc, #cc,
 		#cc, #cc, #cc, #cc
 end_data_segment:
 
 
-
-OFFSET #fd0
-;metadata
-dw end_code_segment-#200
-dw end_data_segment-#900
 OFFSET #fe0
 ;my signature
 db #4e, #6f, #61, #6d, #20, #47, #69, #6c
